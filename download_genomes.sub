@@ -1,0 +1,25 @@
+container_image = docker://staphb/ncbi-datasets:18.0.2
+
+executable = download_genomes.sh
+
+ResearchDrive = pelican://chtc.wisc.edu/researchdrive/ptran5/CHTC
+
+#transfer_input_files = $(ResearchDrive)/test.txt
+transfer_output_files = ncbi_dataset.zip
+transfer_output_remaps = "ncbi_dataset.zip = $(ResearchDrive)/StaphEpi/ncbi_dataset.zip"
+
+log = logs/download.log
+error = logs/download.err
+output = logs/download.out
+
+notify_user = ptran5@wisc.edu
+notification = Complete
+
+requirements = (HasCHTCStaging == true) && (OpSysMajorVer > 7)
+
+# Make sure you request enough disk for the container image in addition to your other input files
+request_cpus = 1
+request_memory = 10GB
+request_disk = 500GB 
+
+queue
