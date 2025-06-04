@@ -1,4 +1,6 @@
-container_image = file:///staging/ptran5/apptainer/gitlab/isescan_v1.7.3.sif
+#container_image = file:///staging/ptran5/apptainer/gitlab/isescan_v1.7.3.sif
+#universe = docker
+container_image = docker://quay.io/biocontainers/isescan:1.7.3--h7b50bb2_0
 
 executable = isescan.sh
 
