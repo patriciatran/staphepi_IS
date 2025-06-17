@@ -1,0 +1,31 @@
+
+container_image = file:///staging/ptran5/apptainer/defense-finder.sif
+
+executable = defensefinder.sh
+
+ResearchDrive = pelican://chtc.wisc.edu/researchdrive/ptran5/CHTC
+
+arguments = $(sample) $(request_cpus)
+
+transfer_input_files = $(ResearchDrive)/StaphEpi/input/ncbi_dataset/data/$(sample)/protein.faa, defensefinder.sh
+transfer_output_files = defense-finder_$(sample).tar.gz
+transfer_output_remaps = "defense-finder_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/output/defense-finder_$(sample).tar.gz"
+
+#transfer_output_remaps = "defense-finder_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/Defense-Finder/defense-finder_$(sample).tar.gz"
+
+log = logs/defensefinder_$(sample)_$(process)_$(cluster).log
+error = logs/defensefinder_$(sample)_$(process)_$(cluster).err
+output = logs/defensefinder_$(sample)_$(process)_$(cluster).out
+
+#notify_user = ptran5@wisc.edu
+#notification = Complete
+
+requirements = (HasCHTCStaging == true) && (OpSysMajorVer > 7)
+
+# Make sure you request enough disk for the container image in addition to your other input files
+request_cpus = 8
+request_memory = 16GB
+request_disk = 30GB 
+
+queue sample from genome_accessions_folder.txt
+

@@ -9,8 +9,8 @@ ResearchDrive = pelican://chtc.wisc.edu/researchdrive/ptran5/CHTC
 arguments = $(sample) $(request_cpus)
 
 transfer_input_files = $(ResearchDrive)/StaphEpi/input/$(sample).fna
-transfer_output_files = results_$(sample).tar.gz, results/$(sample).fna.sum
-transfer_output_remaps = "results_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/ISEScan/results_$(sample).tar.gz;results/$(sample).fna.sum=$(ResearchDrive)/StaphEpi/ISEScan/$(sample).fna.sum"
+transfer_output_files = results_$(sample).tar.gz, results_$(sample)/$(sample).fna.sum, results_$(sample)/$(sample).fna.tsv
+transfer_output_remaps = "results_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/ISEScan/results_$(sample).tar.gz;results_$(sample)/$(sample).fna.sum=$(ResearchDrive)/StaphEpi/ISEScan/$(sample).fna.sum; results_$(sample)/$(sample).fna.tsv=$(ResearchDrive)/StaphEpi/ISEScan/$(sample).fna.tsv"
 
 log = logs/isescan_$(sample)_$(process)_$(cluster).log
 error = logs/isescan_$(sample)_$(process)_$(cluster).err
@@ -27,3 +27,4 @@ request_memory = 16GB
 request_disk = 30GB 
 
 queue sample from genome_accessions.txt
+#queue sample from ref.txt
