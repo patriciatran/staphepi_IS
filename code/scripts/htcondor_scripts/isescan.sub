@@ -1,16 +1,19 @@
-#container_image = file:///staging/ptran5/apptainer/gitlab/isescan_v1.7.3.sif
-#universe = docker
 container_image = docker://quay.io/biocontainers/isescan:1.7.3--h7b50bb2_0
 
 executable = isescan.sh
 
 ResearchDrive = pelican://chtc.wisc.edu/researchdrive/ptran5/CHTC
 
+# Path to data:
+#/Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/
+
 arguments = $(sample) $(request_cpus)
 
-transfer_input_files = $(ResearchDrive)/StaphEpi/input/$(sample).fna
-transfer_output_files = results_$(sample).tar.gz, results_$(sample)/$(sample).fna.sum, results_$(sample)/$(sample).fna.tsv
-transfer_output_remaps = "results_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/ISEScan/results_$(sample).tar.gz;results_$(sample)/$(sample).fna.sum=$(ResearchDrive)/StaphEpi/ISEScan/$(sample).fna.sum; results_$(sample)/$(sample).fna.tsv=$(ResearchDrive)/StaphEpi/ISEScan/$(sample).fna.tsv"
+transfer_input_files = $(ResearchDrive)/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/$(sample).fasta
+transfer_output_files = results_$(sample).tar.gz, results_$(sample)/$(sample).fasta.sum, results_$(sample)/$(sample).fasta.tsv
+transfer_output_remaps = "results_$(sample).tar.gz = $(ResearchDrive)/StaphEpi/ISEScan/1Mbp/results_$(sample).tar.gz; \
+	results_$(sample)/$(sample).fasta.sum=$(ResearchDrive)/StaphEpi/ISEScan/1Mbp/$(sample).fasta.sum; \
+	results_$(sample)/$(sample).fasta.tsv=$(ResearchDrive)/StaphEpi/ISEScan/1Mbp/$(sample).fasta.tsv"
 
 log = logs/isescan_$(sample)_$(process)_$(cluster).log
 error = logs/isescan_$(sample)_$(process)_$(cluster).err
@@ -26,5 +29,4 @@ request_cpus = 8
 request_memory = 16GB
 request_disk = 30GB 
 
-queue sample from genome_accessions.txt
-#queue sample from ref.txt
+queue sample from samples.txt
