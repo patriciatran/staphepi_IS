@@ -584,7 +584,9 @@ HTcondor will submit 201 jobs.
 
 ## Visualizing the output files
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
+library(ggpubr)
+
 folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/output" 
 files <- list.files(path = folder_path, pattern = ".*defense_finder_genes.*1Mbp.tsv", full.names = TRUE)
 #files
@@ -689,7 +691,7 @@ write.table(defense_data_all, "tables/defense_finder_all.tsv", sep="\t", row.nam
 
 The blastn analysis of IS431-meclike is Figure 1A and the defense-finder plot is for figure 1B. The isescan figure is for supplementary.
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 library(ggpubr)
 
 # Figure 1
@@ -700,11 +702,11 @@ panelA <- ggarrange(histogram_IS431, plot431mec_linear,
 panelA
 
 #top_plot <- ggarrange(panelA, IS_all_plot_linear, 
-                      nrow=2, 
-                      labels="AUTO", 
-                      common.legend = TRUE, 
-                      legend = "bottom",
-                      heights = c(0.8,0.5))
+#                      nrow=2, 
+#                      labels="AUTO", 
+#                      common.legend = TRUE, 
+#                      legend = "bottom",
+#                      heights = c(0.8,0.5))
 
 #top_plot 
 
