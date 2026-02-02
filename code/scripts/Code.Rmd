@@ -1,0 +1,722 @@
+---
+title: "Insertion sites in Staph epi"
+author: "Patricia Tran"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+editor_options:
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+theme: lumen
+---
+
+# Overview
+
+The goal of this document is to detail the steps taken to generated figure 1A and B of the paper [TBD].
+There 2 two main analysis, building on the same input data. 
+All Staph epi complete RefSeq genomes were downloaded from NCBI and
+1- The IS elements were found on the genomes
+2- Defense and Anti-defense systems were found in the genomes
+
+
+# Preparing the data
+
+## Gather Staph epi Genomes
+
+We used ncbi-datasets to download complete Staph epi genomes:
+
+```{bash, eval=FALSE}
+datasets download genome taxon 'Staphylococcus epidermidis' --assembly-level complete --include genome,cds,protein,gbff --mag exclude --assembly-source 'RefSeq'
+
+```
+
+This downloaded 225 genomes, including the "reference" RP62A (which has
+the accession ID: `GCF_000011925.1_genomic`)
+
+## Extract coordinates and sequences
+
+We created a python script that would use the GFF file downloaded from
+Genbank and look for the gene dnaA (origin) and the rlmH gene. Then, it
+extract 1Mbp downstream of the rlmH gene.
+
+This script will create an individual FASTA file for each assembly,
+where the coordinates are reoriented such that dnaA starts at position
+bp=1, and creates a table that shows where rlmH should be plotted.
+
+```{python, eval=FALSE}
+import os
+from Bio import SeqIO
+from pathlib import Path
+import csv
+
+# === Parameters ===
+gbff_root = Path("ncbi_dataset/data")
+output_dir = Path("dnaA_to_rlmH_fasta_per_assembly_1Mbp")
+output_dir.mkdir(parents=True, exist_ok=True)
+
+summary_path = output_dir / "dnaA_rlmH_coordinates_1Mbp.tsv"
+downstream_buffer = 1_000_000
+start_gene = "dnaA"
+end_gene = "rlmH"
+
+summary_rows = []
+
+for gbff_file in gbff_root.glob("*/*.gbff"):
+    with open(gbff_file, "r") as handle:
+        for record in SeqIO.parse(handle, "genbank"):
+            if "plasmid" in record.description.lower():
+                continue
+
+            dnaA_feature = None
+            rlmH_feature = None
+
+            for feature in record.features:
+                if feature.type != "gene":
+                    continue
+                gene_names = feature.qualifiers.get("gene", [])
+                if start_gene in gene_names:
+                    dnaA_feature = feature
+                elif end_gene in gene_names:
+                    rlmH_feature = feature
+
+            if not dnaA_feature or not rlmH_feature:
+                print(f"Skipping {gbff_file.name}: missing dnaA or rlmH")
+                continue
+
+            dnaA_start = int(dnaA_feature.location.start)
+            rlmH_strand = rlmH_feature.location.strand
+            assembly = gbff_file.parts[-2]
+
+            if rlmH_strand == 1:
+                rlmH_start = int(rlmH_feature.location.start)
+                rlmH_end = int(rlmH_feature.location.end)
+                region_start = dnaA_start
+                region_end = min(len(record.seq), rlmH_end + downstream_buffer)
+                if region_end <= region_start:
+                    continue
+                subseq = record.seq[region_start:region_end]
+                rlmH_rel_start = rlmH_start - dnaA_start
+                rlmH_rel_end = rlmH_end - dnaA_start
+            elif rlmH_strand == -1:
+                rlmH_start = int(rlmH_feature.location.start)
+                rlmH_end = int(rlmH_feature.location.end)
+                region_start = max(0, rlmH_start - downstream_buffer)
+                region_end = dnaA_start
+                if region_end <= region_start:
+                    continue
+                subseq = record.seq[region_start:region_end].reverse_complement()
+                # Reverse-complemented region: compute relative positions from end
+                rlmH_rel_start = region_end - rlmH_end
+                rlmH_rel_end = region_end - rlmH_start
+            else:
+                print(f"Skipping {gbff_file.name}: unknown rlmH strand")
+                continue
+
+            fasta_id = f"{assembly}_{record.id}_dnaA0_rlmHplus1Mbp"
+            fasta_path = output_dir / f"{fasta_id}.fasta"
+            with open(fasta_path, "w") as out_fasta:
+                out_fasta.write(f">{fasta_id}\n")
+                for i in range(0, len(subseq), 60):
+                    out_fasta.write(str(subseq[i:i+60]) + "\n")
+
+            summary_rows.append({
+                "Assembly": assembly,
+                "Contig_ID": record.id,
+                "Strand": "+" if rlmH_strand == 1 else "-",
+                "Extracted_Length": len(subseq),
+                "rlmH_relative_start": rlmH_rel_start,
+                "rlmH_relative_end": rlmH_rel_end
+            })
+
+# Write summary table
+with open(summary_path, "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=summary_rows[0].keys(), delimiter="\t")
+    writer.writeheader()
+    writer.writerows(summary_rows)
+
+print(f"\nCompleted. Summary table: {summary_path}")
+
+```
+
+We run the script using the command:
+
+```         
+ls ncbi_dataset/data/*/*.gbff | wc -l
+     225
+cd /Users/ptran5/StaphEpi
+python extract_dnaA_to_1Mbp_downstream_rlmH.py
+```
+
+Printout:
+
+```         
+python extract_dnaA_to_1Mbp_downstream_rlmH.py
+Skipping GCF_029691815.1_genomic.gbff: missing dnaA or rlmH
+
+Completed. Summary table: dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv
+```
+
+The file `dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv` contains the coordinates of the
+rlmH file.
+
+```         
+(base) ptran5@dep-apricot StaphEpi % head dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv
+Assembly    Contig_ID   Strand  Extracted_Length    rlmH_relative_start rlmH_relative_end
+GCF_045945235.1 NZ_CP064644.1   +   1032156 31676   32156
+GCF_900086615.2 NZ_LT571449.1   +   1032173 31693   32173
+GCF_042464775.1 NZ_CP170250.1   +   1031608 31128   31608
+GCF_025558665.1 NZ_CP094728.1   +   1032164 31684   32164
+GCF_029691855.1 NZ_CP121518.1   -   847908  30317   30797
+GCF_016903555.1 NZ_CP069951.1   -   1030813 30333   30813
+GCF_021484865.1 NZ_CP090575.1   +   1032170 31690   32170
+GCF_045926605.1 NZ_CP064453.1   +   1032166 31686   32166
+GCF_045934295.1 NZ_CP064543.1   +   1032174 31694   32174
+```
+
+This script was created with code assistance from genAI, and verified by
+a human to ensure correctness.
+
+Now, we have 201 out of 225 genomes now.
+
+Note that the `fasta` files in the folder `dnaA_to_rlmH_fasta_per_assembly_1Mbp` are re-oriented. The columns rlmH relative start and relative end are relative to the start of the fasta sequence.
+Importantly, this means that the sequences and coordinates from this folder might be different from one that we would download directly from NCBI. This becomes important later on.
+
+# Insertion sites
+
+We will use 2 software programs to analyse the data generated from the
+Python script. ISEScan and ISFinder.
+
+For some reason, IS431mec is not in the ISEScan database, so we used the
+sequence in ISFinder to search for that one specifically.
+
+## ISFinder for IS431mec [Figure 1A]
+
+Going on the ISFinder website, we scroll to find the IS431 sequence and
+save it as a fasta file.
+
+<https://isfinder.biotoul.fr/scripts/ficheIS.php?name=IS431mec>
+
+Sequences `IS431-meclike.fasta`
+
+```         
+>IS431-meclike
+GGTTCTGTTGCAAAGTTGAATTTATAGTATAATTTTAACAAAAAGGAGTCTTCTGTATGAACTATTTCAGATATAAACAATTTAACAAGGATGTTATCAC
+TGTAGCCGTTGGCTACTATCTAAGATATACATTGAGTTATCGTGATATATCTGAAATATTAAGGGAACGTGGTGTAAACGTTCATCATTCAACGGTCTAC
+CGTTGGGTTCAAGAATATGCCCCAATTTTGTATCAAATTTGGAAGAAAAAGCATAAAAAAGCTTATTACAAATGGCGTATTGATGAGACGTACATCAAAA
+TAAAAGGAAAATGGAGCTATTTATATCGTGCCATTGATGCAGAGGGACATACATTAGATATTTGGTTGCGTAAGCAACGAGATAATCATTCAGCATATGC
+GTTTATCAAACGTCTCATTAAACAATTTGGTAAACCTCAAAAGGTAATTACAGATCAGGCACCTTCAACGAAGGTAGCAATGGCTAAAGTAATTAAAGCT
+TTTAAACTTAAACCTGACTGTCATTGTACATCGAAATATCTGAATAACCTCATTGAGCAAGATCACCGTCATATTAAAGTAAGAAAGACAAGGTATCAAA
+GTATCAATACAGCAAAGAATACTTTAAAAGGTATTGAATGTATTTACGCTCTATATAAAAAGAACCGCAGGTCTCTTCAGATCTACGGATTTTCGCCATG
+CCACGAAATTAGCATCATGCTAGCAAGTTAAGCGAACACTGACATGATAAATTAGTGGTTAGCTATATTTTTTTACTTTGCAACAGAACC
+```
+
+We created a Conda environment with the software blast. Then we use
+BLAST to create a nucleotide database using the sequences created by the
+python script \`{genome}\_`` dnaA_rlmH_coordinates.tsv`. ``
+
+```{bash, eval=FALSE}
+# Create conda environment:
+conda create -n blast
+conda activate blast
+conda install -c bioconda blast
+         
+# Check that it works:               
+blastn -h
+                      
+# Cd into the results directory and concatenate all the fasta sequences prior to creating a database.  
+cd /Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp
+cat *.fasta > all.fasta
+
+# Make the blast DB.
+makeblastdb -dbtype nucl -in all.fasta
+
+# Use the FASTA sequence downloaded from ISFinder to perform a blast search.
+cp ../IS431-meclike.fasta .
+blastn -db all.fasta -query IS431-meclike.fasta -out blast_out_1Mbp.tsv -outfmt 6
+                        
+```
+
+### Plotting the IS431 hits
+
+We will use the BLAST table `blast_out.tsv`, which contains the
+positions of the identified IS431mec elements along the 1Mbp, with the
+file `dnaA_rlmH_coordinates.tsv` to plot where the IS431 elements are in
+the genomes.
+
+```{r}
+# Load packages
+library(tidyverse)
+
+# Import the blast output table
+blast <- read.table("/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/blast_out_1Mbp.tsv",sep="\t")
+
+# replace column names:
+colnames(blast) <- c("qseqid","sseqid","pident","length","mismatch","gapopen","qstart","qend",
+                     "sstart","send","evalue","bitscore")
+
+# clean up the names:
+blast <- blast %>% separate(sseqid, sep="_NZ|_NC", remove = FALSE, into=c("Assembly", "Accession"))
+
+
+blast <- blast %>% mutate(Accession = ifelse(grepl("_NZ",sseqid), 
+                                             paste0("NZ", Accession), 
+                                             paste0("NC", Accession)))
+
+blast$Accession <- str_replace(blast$Accession, "_dnaA0_.*","")
+
+# Import rlmH positions tables
+rlmH <- read.table("/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv", header=TRUE)
+rlmH <- rlmH %>% filter(rlmH_relative_start >0)
+
+# plot the blast results
+ggplot(blast, aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=sstart, xend=send))
+
+# Only plot high percent identify matches (>98%)
+plot431mec <- blast %>% filter(pident > 98) %>%
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=sstart, xend=send), col="red")+
+  geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+
+    geom_vline(xintercept = 0)+
+  xlab("dnaA = bp position 0; black = rlmH gene, red = identified IS431meclike")+
+  ylab("Accessions")+
+  ggtitle("from origin to 1Mbp downstream of rlmH")+
+  theme_minimal()+
+  theme(axis.text.y = element_blank())+
+  xlim(0,1000000)+
+  #scale_x_continuous(breaks = seq(0,1000000,100000),
+  #                   labels = seq(0,1000000,100000)/100000)+
+  geom_vline(xintercept = 0)+
+
+  coord_polar()+
+  xlab("bp")+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank())
+
+
+plot431mec
+
+ggsave("figures/IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
+
+# Linear plot:
+plot431mec_linear <- blast %>% filter(pident > 98) %>%
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=sstart, xend=send), col="black")+
+  geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+
+  geom_vline(xintercept = 0)+
+  xlab("dnaA = bp position 0; black = rlmH gene, red = identified IS431meclike")+
+  ylab("Accessions")+
+  ggtitle("from origin to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank())+
+  xlim(0,1000000)+
+  #scale_x_continuous(breaks = seq(0,1000000,100000),
+  #                   labels = seq(0,1000000,100000)/100000)+
+  geom_vline(xintercept = 0)+
+  xlab("bp")+
+  theme(panel.background = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text = element_text(color="black"),
+        panel.border = element_rect(color="black"))
+
+plot431mec_linear
+
+ggsave("figures/IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
+
+histogram_IS431 <- blast %>% filter(pident > 98) %>%
+  ggplot(aes(x=sstart)) +
+  geom_density(fill="black")+
+  xlab("bp")+
+  theme(panel.background = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text = element_text(color="black"),
+        panel.border = element_rect(color="white"))
+  
+histogram_IS431
+
+# Just RP62A:
+blast %>% filter(Assembly == "GCF_000011925.1") %>% 
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=sstart, xend=send), col="red")+
+  geom_segment(data = rlmH %>% filter(Assembly == "GCF_000011925.1"), 
+               aes(y=Contig_ID, 
+                   x=rlmH_relative_start, 
+                   xend= rlmH_relative_end), 
+               col="black")+
+  geom_vline(xintercept = 0)+
+  xlab("dnaA = bp position 0; black = rlmH gene, red = identified IS431meclike")+
+  ylab("Accessions")+
+  ggtitle("from origin to 1Mbp downstream of rlmH; RP62A only")+
+  theme_minimal()+
+#  scale_x_continuous(breaks = seq(0,340000,10000),
+#                     labels = seq(0,340000,10000)/10000)+
+  xlim(0,100000)+
+  xlab("bp (kb)")
+
+  
+hist(blast$sstart)
+```
+
+## ISEScan analysis [Supplemental Figure]
+
+Using the same fasta files named
+`/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/{genome}_dnaA0_rlmHplus1Mbp.fasta`,
+we will use the program ISEScan.
+
+First we need to organize the data by copying this all into the
+ResearchDrive CHTC folder to use as input:
+
+`/home/ptran5/github_test/staphepi_IS`
+
+```{bash, eval=FALSE}
+mkdir -p /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp
+cp /Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/.
+
+# Remove files we don't need
+rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/all.fasta*
+rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/IS431-meclike.fasta
+rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/*.tsv
+
+
+# Make a list of all the fasta files in /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/ and copy it over to CHTC and name it samples.txt
+
+ls /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/ > samples.txt
+
+sed 's|.fasta||g' samples.txt > samples_list.txt
+
+# Transfer it to chtc:
+
+scp samples_list.txt [login@login.address]:/home/ptran5/all/github_test/staphepi_IS/samples.txt
+```
+
+### Submit high-throughput jobs on CHTC
+
+We will use HTcondor to submit 201 ISEScan jobs. To do that, we will
+need :
+
+-   a container image with ISEScan in it
+
+-   a submit file
+
+-   an executable file
+
+```         
+### Log into chtc ###
+cd /home/ptran5/all/github_test/staphepi_IS
+
+# Make sure the isescan.sh and isescan.sub path are correct.
+
+# Submit the job
+
+condor_submit isescan.sub
+```
+
+Once all the jobs are done, they will be transferred back to
+ResearchDrive at this path: `/Volumes/ptran5/CHTC/StaphEpi/ISEScan/1Mbp`
+or wherever specified in the HTCondor `transfer_output_files=` path.
+
+### Plotting:
+
+**Important:** This is in ResearchDrive so connect to VPN and then
+connect to the Research using Finder
+
+```{r}
+folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/ISEScan/1Mbp" # Replace with your folder path
+files <- list.files(path = folder_path, pattern = ".*dnaA.*.tsv", full.names = TRUE)
+#files
+length(files)
+# Only keep files with data:
+files <- files[file.info(files)$size > 0]
+#files
+length(files)
+
+#read.table(files[1], sep="\t", header=TRUE)
+
+data_list <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE))
+
+# combine them all:
+data_all <- data_list %>% reduce(full_join)
+
+# Split seqID:
+data_all <- data_all %>% 
+  separate(seqID, sep="_NZ|_NC", remove = FALSE, into=c("Assembly", "Accession")) %>% 
+  mutate(Accession = ifelse(grepl("_NZ",seqID), paste0("NZ", Accession), 
+                            paste0("NC", Accession)),
+         Accession = str_replace(Accession, "_dnaA0_.*",""))
+
+# Plot:
+
+IS_all_plot <- data_all %>% 
+  # complete elements only
+  filter(type == "c") %>%
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=isBegin, xend=isEnd, col=family))+
+  geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+
+  #xlab("dnaA = bp position 0; red = rlmH gene, black dots = identified IS431meclike")+
+  #ylab("Accessions")+
+  theme_minimal()+
+  ggtitle("from origin to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank())+
+  #scale_x_continuous(breaks = seq(0,1000000,100000),
+  #                   labels = seq(0,1000000,100000)/100000)+
+    geom_vline(xintercept = 0)+
+  coord_polar()+
+  xlab("bp")
+
+IS_all_plot
+ggsave("figures/ISplot_1Mbp.pdf", width = 10, height = 4)
+
+# Linear
+IS_all_plot_linear <- data_all %>% 
+  # complete elements only
+  filter(type == "c") %>%
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, x=isBegin, xend=isEnd, col=family))+
+  geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+
+  #xlab("dnaA = bp position 0; red = rlmH gene, black dots = identified IS431meclike")+
+  #ylab("Accessions")+
+  ggtitle("from origin to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank())+
+  #scale_x_continuous(breaks = seq(0,1000000,100000),
+  #                   labels = seq(0,1000000,100000)/100000)+
+    geom_vline(xintercept = 0)+
+  xlab("bp")+
+    theme(panel.background = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text = element_text(color="black"),
+        panel.border = element_rect(color="black"),
+        legend.key.size = unit(0.2, 'cm'))+
+  xlim(0,1000000)
+
+IS_all_plot_linear
+ggsave("figures/ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
+
+# RP62A:
+data_all %>% 
+  # complete elements only
+  filter(type == "c") %>%
+  filter(Assembly == "GCF_000011925.1") %>%
+  ggplot(aes(y=Accession))+
+  geom_segment(aes(y=Accession, 
+                   x=isBegin, 
+                   xend=isEnd, 
+                   col=family))+
+  geom_segment(data = rlmH %>% filter(Assembly == "GCF_000011925.1"), 
+               aes(y=Contig_ID, 
+                   x=rlmH_relative_start, 
+                   xend= rlmH_relative_end), 
+               col="black")+
+  #xlab("dnaA = bp position 0; red = rlmH gene, black dots = identified IS431meclike")+
+  #ylab("Accessions")+
+  theme_minimal()+
+  ggtitle("from origin to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank())+
+#  scale_x_continuous(breaks = seq(0,340000,10000),
+#                     labels = seq(0,340000,10000)/1000)+
+  coord_polar()+
+  xlab("bp (kb)")
+```
+
+### Extracting data for RP62A only:
+
+```{r}
+rp62a <- data_all %>% 
+  # complete elements only
+  filter(Assembly == "GCF_000011925.1") 
+```
+
+### More plots
+
+```{r}
+data_all %>% filter(type == "c") %>%
+  group_by(family) %>% tally() %>%
+  ggplot(aes(x=family, y=n))+
+  geom_col()
+```
+
+The most common type is IS6, which seems to be a clinically relevant IS:
+<https://mobilednajournal.biomedcentral.com/articles/10.1186/s13100-021-00239-x>
+
+IS3 seems to be common too:
+
+```{r}
+data_all %>% filter(type == "c") %>%
+  group_by(family, cluster) %>% tally() %>%
+  ggplot(aes(x=cluster, y=n))+
+  geom_col()+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=90))
+```
+
+# DefenseFinder [Figure 1B]
+
+In the Hossain et al., paper
+(<https://www.nature.com/articles/s41467-024-53146-z>), the authors
+showed that there was a high concentration of defense and anti-defense
+systems downstream of rlmH.
+
+We are running defense-finder (same tool as in their paper) v.2.0.0
+(<https://github.com/mdmparis/defense-finder>) and will plot a similar
+circular figure for our analysis. The input files are the same
+`dnaA_rlmH_plus_1Mp` oriented genome segments.
+
+
+## Submitting the DefenseFinder jobs on CHTC
+
+The scripts to are this are : `defensefinder.sh`, `defensefinder.sh` and the Apptainer definition file to build the container image is `defensefinder.def`. The submit file also needs a `samples.txt` file listing the fasta sequence.
+
+**Note**: If we already ran the `isescan.sub` script previously, it uses the same input files, so no need to reorganize that. It also uses the exact same `samples.txt` file.
+
+The input for defensefinder are fasta files. We will use the same-orientation files from this folder:
+`dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta`. We first need to copy them from our local laptop location to the RD input folder location. The job can be submitted using `condor_submit defensefinder.sub` once logged into the CHTC access point.
+
+HTcondor will submit 201 jobs. 
+
+
+## Visualizing the output files
+
+```{r, eval=FALSE}
+folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/output" 
+files <- list.files(path = folder_path, pattern = ".*defense_finder_genes.*1Mbp.tsv", full.names = TRUE)
+#files
+defense_data <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE, quote = ""))
+
+
+# Filter df with 0 rows:
+defense_data_no_empty <- Filter(nrow, defense_data)
+
+defense_data_all <- defense_data_no_empty %>% reduce(full_join)
+
+summary(defense_data_all)
+head(defense_data_all)
+
+defense_data_all <- defense_data_all %>% 
+  separate(replicon, sep="_NZ|_NC", remove = FALSE, into=c("Assembly", "Accession")) %>% 
+  mutate(Accession = ifelse(grepl("_NZ",replicon), 
+                            paste0("NZ", Accession), 
+                            paste0("NC", Accession)),
+         Accession = str_replace(Accession, "_dnaA0_.*",""))
+
+
+defense_plot <- defense_data_all %>% 
+  ggplot(aes(x=hit_pos, 
+             y=Accession, 
+             fill=type))+
+    geom_vline(xintercept = 1)+
+  geom_tile()+
+  #geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+ 
+  #coord_polar()+
+  theme_minimal()+
+  ggtitle("Defense and anti-defense systems from origin (dnaA) to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank()
+        )+
+  scale_x_continuous(breaks = seq(0,1000,100),
+                     labels = seq(0,1000,100))+
+  
+xlab("Protein position relative to the origin")+
+coord_radial(expand = FALSE)+
+  theme(
+    panel.background = element_rect(fill = NA, color = "black") # Set fill color and remove border
+  )
+ 
+
+defense_plot
+ggsave("figures/defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
+
+defense_plot_linear <- defense_data_all %>% 
+  ggplot(aes(x=hit_pos, 
+             y=Accession, 
+             fill=type))+
+    geom_vline(xintercept = 1)+
+  geom_tile()+
+  #geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+ 
+  #coord_polar()+
+  theme_minimal()+
+  ggtitle("Defense and anti-defense systems from origin (dnaA) to 1Mbp downstream of rlmH")+
+  theme(axis.text.y = element_blank()
+        )+
+  scale_x_continuous(breaks = seq(0,1000,100),
+                     labels = seq(0,1000,100))+
+xlab("Protein position relative to the origin")+
+      theme(panel.background = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text = element_text(color="black"),
+        panel.border = element_rect(color="black"))
+
+defense_plot_linear
+
+# This is Figure 1b.
+
+defense_plot_linear_legend <- get_legend(defense_plot_linear)
+
+defense_plot_linear_small_legend <- defense_data_all %>% 
+  ggplot(aes(x=hit_pos, 
+             y=Accession, 
+             fill=type))+
+    geom_vline(xintercept = 1)+
+  geom_tile()+
+  theme_minimal()+
+  ggtitle("Defense and anti-defense systems from origin (dnaA) to 1Mbp downstream of rlmH")+
+  scale_x_continuous(breaks = seq(0,1000,100),
+                     labels = seq(0,1000,100))+
+xlab("Protein position relative to the origin")+
+      theme(panel.background = element_blank(),
+            axis.text.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.text = element_text(color="black"),
+            legend.key.size = unit(0.2, 'cm'),
+             panel.border = element_rect(color="black"),
+            panel.grid.minor = element_blank(),
+            panel.grid.minor.y = element_blank(),
+             panel.grid.major.y = element_blank())
+
+defense_plot_linear_small_legend
+
+write.table(defense_data_all, "tables/defense_finder_all.tsv", sep="\t", row.names = FALSE, quote = FALSE)
+```
+
+# Final Figures
+
+The blastn analysis of IS431-meclike is Figure 1A and the defense-finder plot is for figure 1B. The isescan figure is for supplementary.
+
+```{r, eval=FALSE}
+library(ggpubr)
+
+# Figure 1
+panelA <- ggarrange(histogram_IS431, plot431mec_linear, 
+          labels=c("A",""), nrow=2, heights = c(0.4,1), 
+          align="h")
+
+panelA
+
+#top_plot <- ggarrange(panelA, IS_all_plot_linear, 
+                      nrow=2, 
+                      labels="AUTO", 
+                      common.legend = TRUE, 
+                      legend = "bottom",
+                      heights = c(0.8,0.5))
+
+#top_plot 
+
+ggarrange(panelA, 
+          defense_plot_linear_small_legend, 
+          nrow=2, 
+          heights = c(1,0.5))
+ggsave("figures/Figure1AB.pdf", width = 8.5, height = 6)
+
+
+ggsave(plot=IS_all_plot_linear,filename="figures/SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
+
+
+```
+
