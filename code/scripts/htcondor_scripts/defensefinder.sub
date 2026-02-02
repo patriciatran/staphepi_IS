@@ -1,4 +1,4 @@
-container_image = file:///staging/ptran5/apptainer/defense-finder.sif
+container_image = file:///staging/ptran5/all/apptainer/defense-finder.sif
 
 executable = defensefinder.sh
 
@@ -6,15 +6,15 @@ ResearchDrive = pelican://chtc.wisc.edu/researchdrive/ptran5/CHTC
 
 arguments = $(sample) $(request_cpus)
 
-transfer_input_files = $(ResearchDrive)/StaphEpi/input/ncbi_dataset/data/$(sample)/protein.faa, defensefinder.sh
+transfer_input_files = $(ResearchDrive)/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/$(sample).fasta, defensefinder.sh
 
-transfer_output_files = defense-finder_$(sample)/protein_defense_finder_genes.tsv, \
-    defense-finder_$(sample)/protein_defense_finder_systems.tsv, \
-    defense-finder_$(sample)/protein_defense_finder_hmmer.tsv
+transfer_output_files = defense-finder_$(sample)/$(sample)_defense_finder_genes.tsv, \
+    defense-finder_$(sample)/$(sample)_defense_finder_systems.tsv, \
+    defense-finder_$(sample)/$(sample)_defense_finder_hmmer.tsv
 
-transfer_output_remaps = "defense-finder_$(sample)/protein_defense_finder_genes.tsv=$(ResearchDrive)/StaphEpi/output/protein_defense_finder_genes_$(sample).tsv; \
-    defense-finder_$(sample)/protein_defense_finder_systems.tsv=$(ResearchDrive)/StaphEpi/output/protein_defense_finder_systems_$(sample).tsv; \
-    defense-finder_$(sample)/protein_defense_finder_hmmer.tsv=$(ResearchDrive)/StaphEpi/output/protein_defense_finder_hmmer_$(sample).tsv"
+transfer_output_remaps = "defense-finder_$(sample)/$(sample)_defense_finder_genes.tsv=$(ResearchDrive)/StaphEpi/output/$(sample)_defense_finder_genes_$(sample).tsv; \
+    defense-finder_$(sample)/$(sample)_defense_finder_systems.tsv=$(ResearchDrive)/StaphEpi/output/$(sample)_defense_finder_systems_$(sample).tsv; \
+    defense-finder_$(sample)/$(sample)_defense_finder_hmmer.tsv=$(ResearchDrive)/StaphEpi/output/$(sample)_defense_finder_hmmer_$(sample).tsv"
 
 
 log = logs/defensefinder_$(sample)_$(cluster).$(process).log
@@ -27,5 +27,4 @@ request_cpus = 8
 request_memory = 16GB
 request_disk = 30GB 
 
-queue sample from genome_accessions_folder.txt
-
+queue sample from samples.txt

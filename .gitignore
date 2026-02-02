@@ -1,4 +1,4 @@
 logs/
 .Rproj.user
-./code/scripts/figures
-./code/scripts/tables
+code/scripts/tables/
+*.Rproj
