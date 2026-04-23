@@ -19,7 +19,6 @@ theme: lumen
 
 # Overview
 
-The goal of this document is to detail the steps taken to generated figure 1A and B of the paper [TBD].
 There 2 two main analysis, building on the same input data. 
 All Staph epi complete RefSeq genomes were downloaded from NCBI and
 1- The IS elements were found on the genomes
@@ -150,7 +149,7 @@ We run the script using the command:
 ```         
 ls ncbi_dataset/data/*/*.gbff | wc -l
      225
-cd /Users/ptran5/StaphEpi
+cd ~/StaphEpi
 python extract_dnaA_to_1Mbp_downstream_rlmH.py
 ```
 
@@ -231,7 +230,7 @@ conda install -c bioconda blast
 blastn -h
                       
 # Cd into the results directory and concatenate all the fasta sequences prior to creating a database.  
-cd /Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp
+cd ~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp
 cat *.fasta > all.fasta
 
 # Make the blast DB.
@@ -255,7 +254,7 @@ the genomes.
 library(tidyverse)
 
 # Import the blast output table
-blast <- read.table("/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/blast_out_1Mbp.tsv",sep="\t")
+blast <- read.table("~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/blast_out_1Mbp.tsv",sep="\t")
 
 # replace column names:
 colnames(blast) <- c("qseqid","sseqid","pident","length","mismatch","gapopen","qstart","qend",
@@ -272,7 +271,7 @@ blast <- blast %>% mutate(Accession = ifelse(grepl("_NZ",sseqid),
 blast$Accession <- str_replace(blast$Accession, "_dnaA0_.*","")
 
 # Import rlmH positions tables
-rlmH <- read.table("/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv", header=TRUE)
+rlmH <- read.table("~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv", header=TRUE)
 rlmH <- rlmH %>% filter(rlmH_relative_start >0)
 
 # plot the blast results
@@ -303,7 +302,7 @@ plot431mec <- blast %>% filter(pident > 98) %>%
 
 plot431mec
 
-ggsave("figures/IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
+ggsave("IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
 
 # Linear plot:
 plot431mec_linear <- blast %>% filter(pident > 98) %>%
@@ -328,7 +327,7 @@ plot431mec_linear <- blast %>% filter(pident > 98) %>%
 
 plot431mec_linear
 
-ggsave("figures/IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
+ggsave("IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
 
 histogram_IS431 <- blast %>% filter(pident > 98) %>%
   ggplot(aes(x=sstart)) +
@@ -368,17 +367,17 @@ hist(blast$sstart)
 ## ISEScan analysis [Supplemental Figure]
 
 Using the same fasta files named
-`/Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/{genome}_dnaA0_rlmHplus1Mbp.fasta`,
+`~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/{genome}_dnaA0_rlmHplus1Mbp.fasta`,
 we will use the program ISEScan.
 
 First we need to organize the data by copying this all into the
 ResearchDrive CHTC folder to use as input:
 
-`/home/ptran5/github_test/staphepi_IS`
+`~/github_test/staphepi_IS`
 
 ```{bash, eval=FALSE}
 mkdir -p /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp
-cp /Users/ptran5/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/.
+cp ~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/.
 
 # Remove files we don't need
 rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/all.fasta*
@@ -394,7 +393,7 @@ sed 's|.fasta||g' samples.txt > samples_list.txt
 
 # Transfer it to chtc:
 
-scp samples_list.txt [login@login.address]:/home/ptran5/all/github_test/staphepi_IS/samples.txt
+scp samples_list.txt [login@login.address]:~/all/github_test/staphepi_IS/samples.txt
 ```
 
 ### Submit high-throughput jobs on CHTC
@@ -410,7 +409,7 @@ need :
 
 ```         
 ### Log into chtc ###
-cd /home/ptran5/all/github_test/staphepi_IS
+cd ~/all/github_test/staphepi_IS
 
 # Make sure the isescan.sh and isescan.sub path are correct.
 
@@ -472,7 +471,7 @@ IS_all_plot <- data_all %>%
   xlab("bp")
 
 IS_all_plot
-ggsave("figures/ISplot_1Mbp.pdf", width = 10, height = 4)
+ggsave("ISplot_1Mbp.pdf", width = 10, height = 4)
 
 # Linear
 IS_all_plot_linear <- data_all %>% 
@@ -498,7 +497,7 @@ IS_all_plot_linear <- data_all %>%
   xlim(0,1000000)
 
 IS_all_plot_linear
-ggsave("figures/ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
+ggsave("ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
 
 # RP62A:
 data_all %>% 
@@ -515,13 +514,9 @@ data_all %>%
                    x=rlmH_relative_start, 
                    xend= rlmH_relative_end), 
                col="black")+
-  #xlab("dnaA = bp position 0; red = rlmH gene, black dots = identified IS431meclike")+
-  #ylab("Accessions")+
   theme_minimal()+
   ggtitle("from origin to 1Mbp downstream of rlmH")+
   theme(axis.text.y = element_blank())+
-#  scale_x_continuous(breaks = seq(0,340000,10000),
-#                     labels = seq(0,340000,10000)/1000)+
   coord_polar()+
   xlab("bp (kb)")
 ```
@@ -532,6 +527,8 @@ data_all %>%
 rp62a <- data_all %>% 
   # complete elements only
   filter(Assembly == "GCF_000011925.1") 
+
+write.table(rp62a, "")
 ```
 
 ### More plots
@@ -585,8 +582,6 @@ HTcondor will submit 201 jobs.
 ## Visualizing the output files
 
 ```{r, eval=TRUE}
-library(ggpubr)
-
 folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/output" 
 files <- list.files(path = folder_path, pattern = ".*defense_finder_genes.*1Mbp.tsv", full.names = TRUE)
 #files
@@ -632,7 +627,7 @@ coord_radial(expand = FALSE)+
  
 
 defense_plot
-ggsave("figures/defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
+ggsave("defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
 
 defense_plot_linear <- defense_data_all %>% 
   ggplot(aes(x=hit_pos, 
@@ -658,7 +653,7 @@ xlab("Protein position relative to the origin")+
 defense_plot_linear
 
 # This is Figure 1b.
-
+library(cowplot)
 defense_plot_linear_legend <- get_legend(defense_plot_linear)
 
 defense_plot_linear_small_legend <- defense_data_all %>% 
@@ -683,8 +678,9 @@ xlab("Protein position relative to the origin")+
              panel.grid.major.y = element_blank())
 
 defense_plot_linear_small_legend
+ggsave(plot=defense_plot_linear_small_legend, filename = "defense_finder.pdf", width = 8, height = 4)
 
-write.table(defense_data_all, "tables/defense_finder_all.tsv", sep="\t", row.names = FALSE, quote = FALSE)
+write.table(defense_data_all, "defense_finder_all.tsv", sep="\t", row.names = FALSE, quote = FALSE)
 ```
 
 # Final Figures
@@ -714,11 +710,157 @@ ggarrange(panelA,
           defense_plot_linear_small_legend, 
           nrow=2, 
           heights = c(1,0.5))
-ggsave("figures/Figure1AB.pdf", width = 8.5, height = 6)
+
+ggsave("Figure1AB.pdf", width = 8.5, height = 6)
 
 
-ggsave(plot=IS_all_plot_linear,filename="figures/SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
+ggsave(plot=IS_all_plot_linear,filename="SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
 
 
+```
+
+# Statistical tests
+
+To determine if the co-occurange of Defense-system + IS element is by chance or not:
+
+```{r}
+# 1. Process Defense Systems (using 'subtype' as the category)
+pa_defense <- defense_data_all %>%
+  select(Accession, subtype) %>%
+  distinct() %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = subtype, values_from = present, values_fill = 0)
+
+# 2. Process IS Elements (using 'family' as the category)
+pa_is <- data_all %>%
+  select(Accession, family) %>%
+  distinct() %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = family, values_from = present, values_fill = 0)
+
+# 3. Blast Table for IS431 mec-like
+
+# Filter for quality (e.g., pident > 98%)
+pa_is_blast <- blast %>%
+  filter(pident >= 98) %>% 
+  select(Accession, qseqid) %>%
+  distinct() %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = qseqid, values_from = present, values_fill = 0)
+
+nrow(pa_defense)
+nrow(pa_is)
+nrow(pa_is_blast)
+
+# 4. Final Merge
+# full_join ensures we keep genomes that might only appear in one of the three tables
+pa_matrix <- pa_defense %>%
+  full_join(pa_is, by = "Accession") %>%
+  full_join(pa_is_blast, by = "Accession") %>%
+  mutate(across(everything(), ~replace_na(., 0)))
+
+dim(pa_matrix)
+nrow(pa_matrix)
+
+# Define the groups for the loop
+is_names <- c(unique(data_all$family), unique(blast$qseqid))
+pas_names <- unique(defense_data_all$subtype)
+
+is_names
+pas_names
+```
+
+Contigency table for the Fisher's test looks like this
+
+```
+
+A | B
+-----
+C | D
+
+[1,1]: Both Present 
+[1,2]: IS Present / PAS Absent 
+[2,1]: IS Absent / PAS Present
+[2,2]: Neither Present 
+
+```
+
+Formula for Fisher's test
+Question: Is there an association between IS elements and defense finders?
+
+Null hypothesis:
+There is no association between genomes with IS elements and genomes with defense systems
+
+
+
+```{r}
+results <- data.frame()
+
+for (is_feat in is_names) {
+  for (pas_feat in pas_names) {
+    
+    if(is_feat %in% colnames(pa_matrix) & pas_feat %in% colnames(pa_matrix)) {
+      
+      # Create table with explicit levels to ensure 2x2 structure even if counts are 0
+      tab <- table(factor(pa_matrix[[is_feat]], levels = c(1, 0)), 
+                   factor(pa_matrix[[pas_feat]], levels = c(1, 0)))
+      
+      # Extract raw counts
+      a <- tab[1,1] # Both
+      b <- tab[1,2] # Only IS
+      c <- tab[2,1] # Only PAS
+      d <- tab[2,2] # Neither
+      
+      test <- fisher.test(tab, alternative = "greater")
+      
+      results <- rbind(results, data.frame(
+        IS_Element = is_feat,
+        Defense_System = pas_feat,
+        P_Value = test$p.value,
+        Odds_Ratio = test$estimate,
+        A_Both_Present = a,
+        B_Only_IS = b,
+        C_Only_PAS = c,
+        D_Neither_Present = d,
+        Total_Genomes = (a + b + c + d)
+      ))
+    }
+  }
+}
+
+# Multiple testing correction
+results$Adjusted_P <- p.adjust(results$P_Value, method = "BH")
+
+# Filter for the most interesting hits
+top_hits <- results %>% filter(Adjusted_P < 0.05) %>% arrange(Adjusted_P)
+
+write.table(x = results, file = "Statistical_results.tsv",quote = FALSE, row.names = FALSE, sep="\t")
+```
+
+
+# Stats by distance:
+
+If they occur nearby:
+
+```{r}
+library(tidyverse)
+
+# Normalize the data: Get a single table of [Genome, Element_Name, Position]
+# Note: Ensure all positions are in the same units (e.g., Nucleotides)
+is_pos <- blast %>% filter(pident > 98) %>%
+  mutate(pos = (sstart + send) / 2, type = "IS") %>%
+  select(Accession, name = qseqid, pos, type)
+
+pas_pos <- defense_data_all %>%
+  # Assuming hit_pos is nucleotide; if it's gene index, multiply by ~1000 or use gene coords
+  mutate(pos = hit_pos, type = "PAS") %>% 
+  select(Accession, name = subtype, pos, type)
+
+# Join them to find pairs in the same genome
+pairs <- inner_join(is_pos, 
+                    pas_pos, 
+                    by = "Accession", 
+                    suffix = c("_IS", "_PAS")) %>%
+  mutate(dist = abs(pos_IS - pos_PAS))
 ```
 
