@@ -2,3 +2,7 @@ logs/
 .Rproj.user
 code/scripts/tables/
 *.Rproj
+.positai
+.DS_Store
+.Rhistory
+code/.DS_Store

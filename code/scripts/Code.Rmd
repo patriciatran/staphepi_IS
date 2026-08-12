@@ -19,11 +19,11 @@ theme: lumen
 
 # Overview
 
-There 2 two main analysis, building on the same input data. 
-All Staph epi complete RefSeq genomes were downloaded from NCBI and
-1- The IS elements were found on the genomes
-2- Defense and Anti-defense systems were found in the genomes
+There 2 two main analysis, building on the same input data. All Staph
+epi complete RefSeq genomes were downloaded from NCBI.
 
+1.  Find where the IS elements were found on the genomes
+2.  Defense and Anti-defense systems were found in the genomes
 
 # Preparing the data
 
@@ -162,8 +162,9 @@ Skipping GCF_029691815.1_genomic.gbff: missing dnaA or rlmH
 Completed. Summary table: dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv
 ```
 
-The file `dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv` contains the coordinates of the
-rlmH file.
+The file
+`dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv`
+contains the coordinates of the rlmH file.
 
 ```         
 (base) ptran5@dep-apricot StaphEpi % head dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv
@@ -184,8 +185,12 @@ a human to ensure correctness.
 
 Now, we have 201 out of 225 genomes now.
 
-Note that the `fasta` files in the folder `dnaA_to_rlmH_fasta_per_assembly_1Mbp` are re-oriented. The columns rlmH relative start and relative end are relative to the start of the fasta sequence.
-Importantly, this means that the sequences and coordinates from this folder might be different from one that we would download directly from NCBI. This becomes important later on.
+Note that the `fasta` files in the folder
+`dnaA_to_rlmH_fasta_per_assembly_1Mbp` are re-oriented. The columns rlmH
+relative start and relative end are relative to the start of the fasta
+sequence. Importantly, this means that the sequences and coordinates
+from this folder might be different from one that we would download
+directly from NCBI. This becomes important later on.
 
 # Insertion sites
 
@@ -195,7 +200,7 @@ Python script. ISEScan and ISFinder.
 For some reason, IS431mec is not in the ISEScan database, so we used the
 sequence in ISFinder to search for that one specifically.
 
-## ISFinder for IS431mec [Figure 1A]
+## ISFinder for IS431mec
 
 Going on the ISFinder website, we scroll to find the IS431 sequence and
 save it as a fasta file.
@@ -302,7 +307,7 @@ plot431mec <- blast %>% filter(pident > 98) %>%
 
 plot431mec
 
-ggsave("IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
+ggsave("figures/IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
 
 # Linear plot:
 plot431mec_linear <- blast %>% filter(pident > 98) %>%
@@ -327,7 +332,7 @@ plot431mec_linear <- blast %>% filter(pident > 98) %>%
 
 plot431mec_linear
 
-ggsave("IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
+ggsave("figures/IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
 
 histogram_IS431 <- blast %>% filter(pident > 98) %>%
   ggplot(aes(x=sstart)) +
@@ -364,7 +369,7 @@ blast %>% filter(Assembly == "GCF_000011925.1") %>%
 hist(blast$sstart)
 ```
 
-## ISEScan analysis [Supplemental Figure]
+## ISEScan analysis
 
 Using the same fasta files named
 `~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/{genome}_dnaA0_rlmHplus1Mbp.fasta`,
@@ -401,11 +406,11 @@ scp samples_list.txt [login@login.address]:~/all/github_test/staphepi_IS/samples
 We will use HTcondor to submit 201 ISEScan jobs. To do that, we will
 need :
 
--   a container image with ISEScan in it
+- a container image with ISEScan in it
 
--   a submit file
+- a submit file
 
--   an executable file
+- an executable file
 
 ```         
 ### Log into chtc ###
@@ -471,7 +476,7 @@ IS_all_plot <- data_all %>%
   xlab("bp")
 
 IS_all_plot
-ggsave("ISplot_1Mbp.pdf", width = 10, height = 4)
+ggsave("figures/ISplot_1Mbp.pdf", width = 10, height = 4)
 
 # Linear
 IS_all_plot_linear <- data_all %>% 
@@ -497,7 +502,7 @@ IS_all_plot_linear <- data_all %>%
   xlim(0,1000000)
 
 IS_all_plot_linear
-ggsave("ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
+ggsave("figures/ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
 
 # RP62A:
 data_all %>% 
@@ -554,7 +559,7 @@ data_all %>% filter(type == "c") %>%
   theme(axis.text.x = element_text(angle=90))
 ```
 
-# DefenseFinder [Figure 1B]
+# DefenseFinder
 
 In the Hossain et al., paper
 (<https://www.nature.com/articles/s41467-024-53146-z>), the authors
@@ -566,18 +571,25 @@ We are running defense-finder (same tool as in their paper) v.2.0.0
 circular figure for our analysis. The input files are the same
 `dnaA_rlmH_plus_1Mp` oriented genome segments.
 
-
 ## Submitting the DefenseFinder jobs on CHTC
 
-The scripts to are this are : `defensefinder.sh`, `defensefinder.sh` and the Apptainer definition file to build the container image is `defensefinder.def`. The submit file also needs a `samples.txt` file listing the fasta sequence.
+The scripts to are this are : `defensefinder.sh`, `defensefinder.sh` and
+the Apptainer definition file to build the container image is
+`defensefinder.def`. The submit file also needs a `samples.txt` file
+listing the fasta sequence.
 
-**Note**: If we already ran the `isescan.sub` script previously, it uses the same input files, so no need to reorganize that. It also uses the exact same `samples.txt` file.
+**Note**: If we already ran the `isescan.sub` script previously, it uses
+the same input files, so no need to reorganize that. It also uses the
+exact same `samples.txt` file.
 
-The input for defensefinder are fasta files. We will use the same-orientation files from this folder:
-`dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta`. We first need to copy them from our local laptop location to the RD input folder location. The job can be submitted using `condor_submit defensefinder.sub` once logged into the CHTC access point.
+The input for defensefinder are fasta files. We will use the
+same-orientation files from this folder:
+`dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta`. We first need to copy
+them from our local laptop location to the RD input folder location. The
+job can be submitted using `condor_submit defensefinder.sub` once logged
+into the CHTC access point.
 
-HTcondor will submit 201 jobs. 
-
+HTcondor will submit 201 jobs.
 
 ## Visualizing the output files
 
@@ -627,7 +639,7 @@ coord_radial(expand = FALSE)+
  
 
 defense_plot
-ggsave("defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
+ggsave("figures/defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
 
 defense_plot_linear <- defense_data_all %>% 
   ggplot(aes(x=hit_pos, 
@@ -678,19 +690,19 @@ xlab("Protein position relative to the origin")+
              panel.grid.major.y = element_blank())
 
 defense_plot_linear_small_legend
-ggsave(plot=defense_plot_linear_small_legend, filename = "defense_finder.pdf", width = 8, height = 4)
+ggsave(plot=defense_plot_linear_small_legend, filename = "figures/defense_finder.pdf", width = 8, height = 4)
 
-write.table(defense_data_all, "defense_finder_all.tsv", sep="\t", row.names = FALSE, quote = FALSE)
+write.table(defense_data_all, "tables/defense_finder_all.tsv", sep="\t", row.names = FALSE, quote = FALSE)
 ```
 
 # Final Figures
 
-The blastn analysis of IS431-meclike is Figure 1A and the defense-finder plot is for figure 1B. The isescan figure is for supplementary.
+Some version of this is used for Supp Figure 4.
 
 ```{r, eval=TRUE}
 library(ggpubr)
 
-# Figure 1
+# Fig S4
 panelA <- ggarrange(histogram_IS431, plot431mec_linear, 
           labels=c("A",""), nrow=2, heights = c(0.4,1), 
           align="h")
@@ -711,156 +723,10 @@ ggarrange(panelA,
           nrow=2, 
           heights = c(1,0.5))
 
-ggsave("Figure1AB.pdf", width = 8.5, height = 6)
+ggsave("figures/FigureSupp4.pdf", width = 8.5, height = 6)
 
 
-ggsave(plot=IS_all_plot_linear,filename="SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
+ggsave(plot=IS_all_plot_linear,filename="figures/SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
 
 
 ```
-
-# Statistical tests
-
-To determine if the co-occurange of Defense-system + IS element is by chance or not:
-
-```{r}
-# 1. Process Defense Systems (using 'subtype' as the category)
-pa_defense <- defense_data_all %>%
-  select(Accession, subtype) %>%
-  distinct() %>%
-  mutate(present = 1) %>%
-  pivot_wider(names_from = subtype, values_from = present, values_fill = 0)
-
-# 2. Process IS Elements (using 'family' as the category)
-pa_is <- data_all %>%
-  select(Accession, family) %>%
-  distinct() %>%
-  mutate(present = 1) %>%
-  pivot_wider(names_from = family, values_from = present, values_fill = 0)
-
-# 3. Blast Table for IS431 mec-like
-
-# Filter for quality (e.g., pident > 98%)
-pa_is_blast <- blast %>%
-  filter(pident >= 98) %>% 
-  select(Accession, qseqid) %>%
-  distinct() %>%
-  mutate(present = 1) %>%
-  pivot_wider(names_from = qseqid, values_from = present, values_fill = 0)
-
-nrow(pa_defense)
-nrow(pa_is)
-nrow(pa_is_blast)
-
-# 4. Final Merge
-# full_join ensures we keep genomes that might only appear in one of the three tables
-pa_matrix <- pa_defense %>%
-  full_join(pa_is, by = "Accession") %>%
-  full_join(pa_is_blast, by = "Accession") %>%
-  mutate(across(everything(), ~replace_na(., 0)))
-
-dim(pa_matrix)
-nrow(pa_matrix)
-
-# Define the groups for the loop
-is_names <- c(unique(data_all$family), unique(blast$qseqid))
-pas_names <- unique(defense_data_all$subtype)
-
-is_names
-pas_names
-```
-
-Contigency table for the Fisher's test looks like this
-
-```
-
-A | B
------
-C | D
-
-[1,1]: Both Present 
-[1,2]: IS Present / PAS Absent 
-[2,1]: IS Absent / PAS Present
-[2,2]: Neither Present 
-
-```
-
-Formula for Fisher's test
-Question: Is there an association between IS elements and defense finders?
-
-Null hypothesis:
-There is no association between genomes with IS elements and genomes with defense systems
-
-
-
-```{r}
-results <- data.frame()
-
-for (is_feat in is_names) {
-  for (pas_feat in pas_names) {
-    
-    if(is_feat %in% colnames(pa_matrix) & pas_feat %in% colnames(pa_matrix)) {
-      
-      # Create table with explicit levels to ensure 2x2 structure even if counts are 0
-      tab <- table(factor(pa_matrix[[is_feat]], levels = c(1, 0)), 
-                   factor(pa_matrix[[pas_feat]], levels = c(1, 0)))
-      
-      # Extract raw counts
-      a <- tab[1,1] # Both
-      b <- tab[1,2] # Only IS
-      c <- tab[2,1] # Only PAS
-      d <- tab[2,2] # Neither
-      
-      test <- fisher.test(tab, alternative = "greater")
-      
-      results <- rbind(results, data.frame(
-        IS_Element = is_feat,
-        Defense_System = pas_feat,
-        P_Value = test$p.value,
-        Odds_Ratio = test$estimate,
-        A_Both_Present = a,
-        B_Only_IS = b,
-        C_Only_PAS = c,
-        D_Neither_Present = d,
-        Total_Genomes = (a + b + c + d)
-      ))
-    }
-  }
-}
-
-# Multiple testing correction
-results$Adjusted_P <- p.adjust(results$P_Value, method = "BH")
-
-# Filter for the most interesting hits
-top_hits <- results %>% filter(Adjusted_P < 0.05) %>% arrange(Adjusted_P)
-
-write.table(x = results, file = "Statistical_results.tsv",quote = FALSE, row.names = FALSE, sep="\t")
-```
-
-
-# Stats by distance:
-
-If they occur nearby:
-
-```{r}
-library(tidyverse)
-
-# Normalize the data: Get a single table of [Genome, Element_Name, Position]
-# Note: Ensure all positions are in the same units (e.g., Nucleotides)
-is_pos <- blast %>% filter(pident > 98) %>%
-  mutate(pos = (sstart + send) / 2, type = "IS") %>%
-  select(Accession, name = qseqid, pos, type)
-
-pas_pos <- defense_data_all %>%
-  # Assuming hit_pos is nucleotide; if it's gene index, multiply by ~1000 or use gene coords
-  mutate(pos = hit_pos, type = "PAS") %>% 
-  select(Accession, name = subtype, pos, type)
-
-# Join them to find pairs in the same genome
-pairs <- inner_join(is_pos, 
-                    pas_pos, 
-                    by = "Accession", 
-                    suffix = c("_IS", "_PAS")) %>%
-  mutate(dist = abs(pos_IS - pos_PAS))
-```
-
