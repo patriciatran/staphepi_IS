@@ -37,7 +37,9 @@ datasets download genome taxon 'Staphylococcus epidermidis' --assembly-level com
 ```
 
 This downloaded 225 genomes, including the "reference" RP62A (which has
-the accession ID: `GCF_000011925.1_genomic`)
+the accession ID: `GCF_000011925.1_genomic`). For reference, that list
+is found on the github repository at
+[NCBI-accessions.txt](./NCBI-accessions.txt)
 
 ## Extract coordinates and sequences
 
@@ -48,6 +50,12 @@ extract 1Mbp downstream of the rlmH gene.
 This script will create an individual FASTA file for each assembly,
 where the coordinates are reoriented such that dnaA starts at position
 bp=1, and creates a table that shows where rlmH should be plotted.
+
+That script is called
+[extract_dnaA_to_1Mbp_downstream.py](./extract_dnaA_to_1Mbp_downstream.py)
+and an example can be found on this repository. If you'd like to reuse
+it, go inside the script and change the genbank file root directory and
+output directory.
 
 ```{python, eval=FALSE}
 import os
@@ -153,7 +161,7 @@ cd ~/StaphEpi
 python extract_dnaA_to_1Mbp_downstream_rlmH.py
 ```
 
-Printout:
+Screen printout:
 
 ```         
 python extract_dnaA_to_1Mbp_downstream_rlmH.py
@@ -180,10 +188,15 @@ GCF_045926605.1 NZ_CP064453.1   +   1032166 31686   32166
 GCF_045934295.1 NZ_CP064543.1   +   1032174 31694   32174
 ```
 
-This script was created with code assistance from genAI, and verified by
-a human to ensure correctness.
+The file dnaA_rlmH_coordinates_1Mbp.tsv is copied here at
+./tables/dnaA_rlmH_coordinates_1Mbp.tsv and contains 201 rows, excluding
+the headers.
 
-Now, we have 201 out of 225 genomes now.
+This python script was created with code assistance from genAI, and
+verified by a human to ensure correctness.
+
+Now, we have 201 out of 225 genomes now that have passed this first
+filter.
 
 Note that the `fasta` files in the folder
 `dnaA_to_rlmH_fasta_per_assembly_1Mbp` are re-oriented. The columns rlmH
@@ -223,7 +236,7 @@ CCACGAAATTAGCATCATGCTAGCAAGTTAAGCGAACACTGACATGATAAATTAGTGGTTAGCTATATTTTTTTACTTTG
 
 We created a Conda environment with the software blast. Then we use
 BLAST to create a nucleotide database using the sequences created by the
-python script \`{genome}\_`` dnaA_rlmH_coordinates.tsv`. ``
+python script `{genome}_dnaA_rlmH_coordinates.tsv`.
 
 ```{bash, eval=FALSE}
 # Create conda environment:
@@ -247,6 +260,9 @@ blastn -db all.fasta -query IS431-meclike.fasta -out blast_out_1Mbp.tsv -outfmt 
                         
 ```
 
+The results from the blast analysis (query, output TSV file, and db) are
+found in the folder named [./blast/](./blast/) .
+
 ### Plotting the IS431 hits
 
 We will use the BLAST table `blast_out.tsv`, which contains the
@@ -259,7 +275,7 @@ the genomes.
 library(tidyverse)
 
 # Import the blast output table
-blast <- read.table("~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/blast_out_1Mbp.tsv",sep="\t")
+blast <- read.table("blast/blast_out_1Mbp.tsv",sep="\t")
 
 # replace column names:
 colnames(blast) <- c("qseqid","sseqid","pident","length","mismatch","gapopen","qstart","qend",
@@ -276,7 +292,7 @@ blast <- blast %>% mutate(Accession = ifelse(grepl("_NZ",sseqid),
 blast$Accession <- str_replace(blast$Accession, "_dnaA0_.*","")
 
 # Import rlmH positions tables
-rlmH <- read.table("~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/dnaA_rlmH_coordinates_1Mbp.tsv", header=TRUE)
+rlmH <- read.table("tables/dnaA_rlmH_coordinates_1Mbp.tsv", header=TRUE)
 rlmH <- rlmH %>% filter(rlmH_relative_start >0)
 
 # plot the blast results
@@ -375,6 +391,9 @@ Using the same fasta files named
 `~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/{genome}_dnaA0_rlmHplus1Mbp.fasta`,
 we will use the program ISEScan.
 
+This part of the analysis was performed on the Center for High
+Throughput Computing (CHTC).
+
 First we need to organize the data by copying this all into the
 ResearchDrive CHTC folder to use as input:
 
@@ -388,7 +407,6 @@ cp ~/StaphEpi/dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta /Volumes/ptran5/CHTC/
 rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/all.fasta*
 rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/IS431-meclike.fasta
 rm /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/*.tsv
-
 
 # Make a list of all the fasta files in /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp/ and copy it over to CHTC and name it samples.txt
 
@@ -427,22 +445,30 @@ Once all the jobs are done, they will be transferred back to
 ResearchDrive at this path: `/Volumes/ptran5/CHTC/StaphEpi/ISEScan/1Mbp`
 or wherever specified in the HTCondor `transfer_output_files=` path.
 
+All the CHTC HTCondor scripts are found in the folder
+[htcondor_scripts](./htcondor_scripts/).
+
 ### Plotting:
 
-**Important:** This is in ResearchDrive so connect to VPN and then
-connect to the Research using Finder
+**Important:** Since this is in ResearchDrive so connect to VPN and then
+connect to the ResearchDrive using Finder "Connect to Server".
+
+Note the folder 1Mbp referred to in the section below is approximately
+700MB and is not uploaded to Github. Please see supplementary data for
+more information.
 
 ```{r}
 folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/ISEScan/1Mbp" # Replace with your folder path
 files <- list.files(path = folder_path, pattern = ".*dnaA.*.tsv", full.names = TRUE)
 #files
 length(files)
+# this should say 201. 
+
 # Only keep files with data:
 files <- files[file.info(files)$size > 0]
 #files
 length(files)
-
-#read.table(files[1], sep="\t", header=TRUE)
+# This should say 200.
 
 data_list <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE))
 
@@ -485,12 +511,8 @@ IS_all_plot_linear <- data_all %>%
   ggplot(aes(y=Accession))+
   geom_segment(aes(y=Accession, x=isBegin, xend=isEnd, col=family))+
   geom_segment(data = rlmH, aes(y=Contig_ID, x=rlmH_relative_start, xend= rlmH_relative_end), col="black")+
-  #xlab("dnaA = bp position 0; red = rlmH gene, black dots = identified IS431meclike")+
-  #ylab("Accessions")+
   ggtitle("from origin to 1Mbp downstream of rlmH")+
   theme(axis.text.y = element_blank())+
-  #scale_x_continuous(breaks = seq(0,1000000,100000),
-  #                   labels = seq(0,1000000,100000)/100000)+
     geom_vline(xintercept = 0)+
   xlab("bp")+
     theme(panel.background = element_blank(),
@@ -526,16 +548,6 @@ data_all %>%
   xlab("bp (kb)")
 ```
 
-### Extracting data for RP62A only:
-
-```{r}
-rp62a <- data_all %>% 
-  # complete elements only
-  filter(Assembly == "GCF_000011925.1") 
-
-write.table(rp62a, "")
-```
-
 ### More plots
 
 ```{r}
@@ -544,11 +556,6 @@ data_all %>% filter(type == "c") %>%
   ggplot(aes(x=family, y=n))+
   geom_col()
 ```
-
-The most common type is IS6, which seems to be a clinically relevant IS:
-<https://mobilednajournal.biomedcentral.com/articles/10.1186/s13100-021-00239-x>
-
-IS3 seems to be common too:
 
 ```{r}
 data_all %>% filter(type == "c") %>%
@@ -578,24 +585,35 @@ the Apptainer definition file to build the container image is
 `defensefinder.def`. The submit file also needs a `samples.txt` file
 listing the fasta sequence.
 
+All these scripts can be found in the folder
+[./htcondor_scripts](./htcondor_scripts).
+
 **Note**: If we already ran the `isescan.sub` script previously, it uses
 the same input files, so no need to reorganize that. It also uses the
 exact same `samples.txt` file.
 
-The input for defensefinder are fasta files. We will use the
+The input for DefenseFinder are fasta files. We will use the
 same-orientation files from this folder:
 `dnaA_to_rlmH_fasta_per_assembly_1Mbp/*.fasta`. We first need to copy
-them from our local laptop location to the RD input folder location. The
-job can be submitted using `condor_submit defensefinder.sub` once logged
-into the CHTC access point.
+them from our local laptop location to the ResearchDrive input folder
+location. The job can be submitted using
+`condor_submit defensefinder.sub` once logged into the CHTC access
+point.
 
 HTcondor will submit 201 jobs.
+
+The folder with the DefenseFolder results is about 25MB and is not
+uploaded to Github, but can be found in a compressed format in the
+Supplementary Materials. A combined version of all the tables can also,
+instead, be found at this location:
+[tables/defense_finder_all.tsv](tables/defense_finder_all.tsv)
 
 ## Visualizing the output files
 
 ```{r, eval=TRUE}
 folder_path <- "/Volumes/ptran5/CHTC/StaphEpi/output" 
 files <- list.files(path = folder_path, pattern = ".*defense_finder_genes.*1Mbp.tsv", full.names = TRUE)
+length(files)
 #files
 defense_data <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE, quote = ""))
 
@@ -702,21 +720,11 @@ Some version of this is used for Supp Figure 4.
 ```{r, eval=TRUE}
 library(ggpubr)
 
-# Fig S4
 panelA <- ggarrange(histogram_IS431, plot431mec_linear, 
           labels=c("A",""), nrow=2, heights = c(0.4,1), 
           align="h")
 
 panelA
-
-#top_plot <- ggarrange(panelA, IS_all_plot_linear, 
-#                      nrow=2, 
-#                      labels="AUTO", 
-#                      common.legend = TRUE, 
-#                      legend = "bottom",
-#                      heights = c(0.8,0.5))
-
-#top_plot 
 
 ggarrange(panelA, 
           defense_plot_linear_small_legend, 
@@ -727,6 +735,4 @@ ggsave("figures/FigureSupp4.pdf", width = 8.5, height = 6)
 
 
 ggsave(plot=IS_all_plot_linear,filename="figures/SuppFigure_ISEScan.pdf", width = 6, height = 2.5)
-
-
 ```

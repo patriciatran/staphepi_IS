@@ -6,3 +6,6 @@ code/scripts/tables/
 .DS_Store
 .Rhistory
 code/.DS_Store
+.RData
+README.html
+Code.html
