@@ -18,25 +18,29 @@ This repository contains for the bioinformatics analysis descripted in the Metho
 
 This github repository contains:
 
-- README.md : this file
+- `README.md` : this file
 
 Code files:
 
-- Code.Rmd : Step-by-step description of the analyses involved, from downloading the raw data to running the python and R code to make the figures.
+- `Code.Rmd` : Step-by-step description of the analyses involved, from downloading the raw data to running the python and R code to make the figures.
 
-- extract_dnaA_to_1Mbp_downstream_rlmH.py : Python code to extract a relevant region of the genomes, using the raw data from NCBI.
+- `Code.md` : A better rendering of the Rmd file to be viewed on the Github website.
+
+- `extract_dnaA_to_1Mbp_downstream_rlmH.py` : Python code to extract a relevant region of the genomes, using the raw data from NCBI.
 
 Folders:
 
-- blast/ : Query and output of the BLAST analysis for the IS131-meclike sequence. The database searched all.fasta is too large to upload to Github.
+- `Code_files/`: Contains all the figures in the Code.md file.
 
-- figures/ : Figures generated from the R code, including extra figures not used in the paper.
+- `blast/` : Query and output of the BLAST analysis for the IS131-meclike sequence. The database searched all.fasta is too large to upload to Github.
 
-- htcondor_scripts/ : HTcondor scripts to run ISEScan and DefenseFinder on CHTC using htcondor.
+- `figures/` : Figures generated from the R code, including extra figures not used in the paper.
 
-- NCBI-accessions.txt : List of the NCBI accession IDs downloaded using ncbi-datasets (raw input data)
+- `htcondor_scripts/` : HTcondor scripts to run ISEScan and DefenseFinder on CHTC using htcondor.
 
-- tables/: Contains a summarize version of the DefenseFinder output, and a table summarizing the coordinates of the dnaA and rlmH genes for the 1Mbp genome fragment.
+- `NCBI-accessions.txt` : List of the NCBI accession IDs downloaded using ncbi-datasets (raw input data)
+
+- `tables/`: Contains a summarize version of the DefenseFinder output, and a table summarizing the coordinates of the dnaA and rlmH genes for the 1Mbp genome fragment.
 
 # Analysis overview
 

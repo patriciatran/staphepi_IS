@@ -37,104 +37,10 @@ where the coordinates are reoriented such that dnaA starts at position
 bp=1, and creates a table that shows where rlmH should be plotted.
 
 That script is called
-[extract_dnaA_to_1Mbp_downstream.py](./extract_dnaA_to_1Mbp_downstream.py)
+[extract_dnaA_to_1Mbp_downstream_rlmH.py](extract_dnaA_to_1Mbp_downstream_rlmH.py)
 and an example can be found on this repository. If you’d like to reuse
 it, go inside the script and change the genbank file root directory and
 output directory.
-
-``` python
-import os
-from Bio import SeqIO
-from pathlib import Path
-import csv
-
-# === Parameters ===
-gbff_root = Path("ncbi_dataset/data")
-output_dir = Path("dnaA_to_rlmH_fasta_per_assembly_1Mbp")
-output_dir.mkdir(parents=True, exist_ok=True)
-
-summary_path = output_dir / "dnaA_rlmH_coordinates_1Mbp.tsv"
-downstream_buffer = 1_000_000
-start_gene = "dnaA"
-end_gene = "rlmH"
-
-summary_rows = []
-
-for gbff_file in gbff_root.glob("*/*.gbff"):
-    with open(gbff_file, "r") as handle:
-        for record in SeqIO.parse(handle, "genbank"):
-            if "plasmid" in record.description.lower():
-                continue
-
-            dnaA_feature = None
-            rlmH_feature = None
-
-            for feature in record.features:
-                if feature.type != "gene":
-                    continue
-                gene_names = feature.qualifiers.get("gene", [])
-                if start_gene in gene_names:
-                    dnaA_feature = feature
-                elif end_gene in gene_names:
-                    rlmH_feature = feature
-
-            if not dnaA_feature or not rlmH_feature:
-                print(f"Skipping {gbff_file.name}: missing dnaA or rlmH")
-                continue
-
-            dnaA_start = int(dnaA_feature.location.start)
-            rlmH_strand = rlmH_feature.location.strand
-            assembly = gbff_file.parts[-2]
-
-            if rlmH_strand == 1:
-                rlmH_start = int(rlmH_feature.location.start)
-                rlmH_end = int(rlmH_feature.location.end)
-                region_start = dnaA_start
-                region_end = min(len(record.seq), rlmH_end + downstream_buffer)
-                if region_end <= region_start:
-                    continue
-                subseq = record.seq[region_start:region_end]
-                rlmH_rel_start = rlmH_start - dnaA_start
-                rlmH_rel_end = rlmH_end - dnaA_start
-            elif rlmH_strand == -1:
-                rlmH_start = int(rlmH_feature.location.start)
-                rlmH_end = int(rlmH_feature.location.end)
-                region_start = max(0, rlmH_start - downstream_buffer)
-                region_end = dnaA_start
-                if region_end <= region_start:
-                    continue
-                subseq = record.seq[region_start:region_end].reverse_complement()
-                # Reverse-complemented region: compute relative positions from end
-                rlmH_rel_start = region_end - rlmH_end
-                rlmH_rel_end = region_end - rlmH_start
-            else:
-                print(f"Skipping {gbff_file.name}: unknown rlmH strand")
-                continue
-
-            fasta_id = f"{assembly}_{record.id}_dnaA0_rlmHplus1Mbp"
-            fasta_path = output_dir / f"{fasta_id}.fasta"
-            with open(fasta_path, "w") as out_fasta:
-                out_fasta.write(f">{fasta_id}\n")
-                for i in range(0, len(subseq), 60):
-                    out_fasta.write(str(subseq[i:i+60]) + "\n")
-
-            summary_rows.append({
-                "Assembly": assembly,
-                "Contig_ID": record.id,
-                "Strand": "+" if rlmH_strand == 1 else "-",
-                "Extracted_Length": len(subseq),
-                "rlmH_relative_start": rlmH_rel_start,
-                "rlmH_relative_end": rlmH_rel_end
-            })
-
-# Write summary table
-with open(summary_path, "w", newline="") as f:
-    writer = csv.DictWriter(f, fieldnames=summary_rows[0].keys(), delimiter="\t")
-    writer.writeheader()
-    writer.writerows(summary_rows)
-
-print(f"\nCompleted. Summary table: {summary_path}")
-```
 
 We run the script using the command:
 
@@ -289,7 +195,7 @@ ggplot(blast, aes(y=Accession))+
   geom_segment(aes(y=Accession, x=sstart, xend=send))
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ``` r
 # Only plot high percent identify matches (>98%)
@@ -320,7 +226,7 @@ plot431mec
     ## Warning: Removed 2 rows containing missing values or values outside the scale range
     ## (`geom_segment()`).
 
-![](Code_files/figure-gfm/unnamed-chunk-4-2.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
 
 ``` r
 ggsave("figures/IS431mec_Sepi_1Mbp.pdf", width = 10, height = 4)
@@ -357,7 +263,7 @@ plot431mec_linear
     ## Warning: Removed 2 rows containing missing values or values outside the scale range
     ## (`geom_segment()`).
 
-![](Code_files/figure-gfm/unnamed-chunk-4-3.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-3.png)<!-- -->
 
 ``` r
 ggsave("figures/IS431mec_Sepi_1Mbp_linear.pdf", width = 6, height = 2)
@@ -380,7 +286,7 @@ histogram_IS431 <- blast %>% filter(pident > 98) %>%
 histogram_IS431
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-4-4.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-4.png)<!-- -->
 
 ``` r
 # Just RP62A:
@@ -406,13 +312,13 @@ blast %>% filter(Assembly == "GCF_000011925.1") %>%
     ## Warning: Removed 4 rows containing missing values or values outside the scale range
     ## (`geom_segment()`).
 
-![](Code_files/figure-gfm/unnamed-chunk-4-5.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-5.png)<!-- -->
 
 ``` r
 hist(blast$sstart)
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-4-6.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-3-6.png)<!-- -->
 
 ## ISEScan analysis
 
@@ -425,8 +331,6 @@ Throughput Computing (CHTC).
 
 First we need to organize the data by copying this all into the
 ResearchDrive CHTC folder to use as input:
-
-`~/github_test/staphepi_IS`
 
 ``` bash
 mkdir -p /Volumes/ptran5/CHTC/StaphEpi/input/dnaA_to_rlmH_plus_1Mbp
@@ -513,607 +417,7 @@ data_list <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE))
 
 # combine them all:
 data_all <- data_list %>% reduce(full_join)
-```
 
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-    ## Joining with `by = join_by(seqID, family, cluster, isBegin, isEnd, isLen,
-    ## ncopy4is, start1, end1, start2, end2, score, irId, irLen, nGaps, orfBegin,
-    ## orfEnd, strand, orfLen, E.value, E.value4copy, type, ov, tir)`
-
-``` r
 # Split seqID:
 data_all <- data_all %>% 
   separate(seqID, sep="_NZ|_NC", remove = FALSE, into=c("Assembly", "Accession")) %>% 
@@ -1143,7 +447,7 @@ IS_all_plot <- data_all %>%
 IS_all_plot
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ``` r
 ggsave("figures/ISplot_1Mbp.pdf", width = 10, height = 4)
@@ -1173,7 +477,7 @@ IS_all_plot_linear
     ## Warning: Removed 28 rows containing missing values or values outside the scale range
     ## (`geom_segment()`).
 
-![](Code_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
 
 ``` r
 ggsave("figures/ISplot_1Mbp_linear.pdf", width =6, height = 2.5)
@@ -1205,7 +509,7 @@ data_all %>%
   xlab("bp (kb)")
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-6-3.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->
 
 ### More plots
 
@@ -1216,7 +520,7 @@ data_all %>% filter(type == "c") %>%
   geom_col()
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
 data_all %>% filter(type == "c") %>%
@@ -1227,7 +531,7 @@ data_all %>% filter(type == "c") %>%
   theme(axis.text.x = element_text(angle=90))
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 # DefenseFinder
 
@@ -1290,610 +594,7 @@ defense_data <- lapply(files, function(x) read.table(x, sep="\t", header=TRUE, q
 defense_data_no_empty <- Filter(nrow, defense_data)
 
 defense_data_all <- defense_data_no_empty %>% reduce(full_join)
-```
 
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-    ## Joining with `by = join_by(replicon, hit_id, gene_name, hit_pos, model_fqn,
-    ## sys_id, sys_loci, locus_num, sys_wholeness, sys_score, sys_occ, hit_gene_ref,
-    ## hit_status, hit_seq_len, hit_i_eval, hit_score, hit_profile_cov, hit_seq_cov,
-    ## hit_begin_match, hit_end_match, counterpart, used_in, type, subtype, activity)`
-
-``` r
 summary(defense_data_all)
 ```
 
@@ -2049,7 +750,7 @@ coord_radial(expand = FALSE)+
 defense_plot
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ``` r
 ggsave("figures/defenseplot_Sepi_1Mbp.pdf", width = 10, height = 4)
@@ -2078,21 +779,11 @@ xlab("Protein position relative to the origin")+
 defense_plot_linear
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->
 
 ``` r
 # This is Figure 1b.
 library(cowplot)
-```
-
-    ## 
-    ## Attaching package: 'cowplot'
-    ## 
-    ## The following object is masked from 'package:lubridate':
-    ## 
-    ##     stamp
-
-``` r
 defense_plot_linear_legend <- get_legend(defense_plot_linear)
 
 defense_plot_linear_small_legend <- defense_data_all %>% 
@@ -2119,7 +810,7 @@ xlab("Protein position relative to the origin")+
 defense_plot_linear_small_legend
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-9-3.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->
 
 ``` r
 ggsave(plot=defense_plot_linear_small_legend, filename = "figures/defense_finder.pdf", width = 8, height = 4)
@@ -2155,7 +846,7 @@ panelA <- ggarrange(histogram_IS431, plot431mec_linear,
 panelA
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
 ggarrange(panelA, 
@@ -2164,7 +855,7 @@ ggarrange(panelA,
           heights = c(1,0.5))
 ```
 
-![](Code_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
+![](Code_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
 
 ``` r
 ggsave("figures/FigureSupp4.pdf", width = 8.5, height = 6)
